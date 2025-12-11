@@ -1,9 +1,10 @@
 # FloorPlan Detection (Walls & Rooms)
 
 
+
 Этот репозиторий содержит код для детекции стен и комнат на архитектурных поэтажных планах с использованием [MMDetection](https://github.com/open-mmlab/mmdetection).
 
-Результаты работы можно увидеть в презентации []
+Результаты работы можно увидеть в папках testing [https://github.com/Eltralo/Room-detection/tree/main/testing]  и results [https://github.com/Eltralo/Room-detection/tree/main/results] 
 
 Внутри:
 - конфигурация модели на базе **Faster R-CNN + ResNet-50 + FPN**;
@@ -18,33 +19,68 @@
 
 ## Архитектура модели
 
-#```mermaid
+```mermaid
 graph TD
-    A[FasterRCNN] --> B[Backbone: ResNet]
+    A[Faster R-CNN] --> B[Backbone: ResNet-50]
     A --> C[Neck: FPN]
     A --> D[RPN Head]
     A --> E[RoI Head]
 
-    B --> B1[Stem: Conv7x7 + BN + ReLU + MaxPool]
-    B --> B2[Layer1: 3 Bottlenecks]
-    B --> B3[Layer2: 4 Bottlenecks]
-    B --> B4[Layer3: 6 Bottlenecks]
-    B --> B5[Layer4: 3 Bottlenecks]
+    B --> B1[Stem + 4 Layers]
+    C --> C1[Lateral + FPN Convs]
+    D --> D1[Conv → Cls/Reg]
+    E --> E1[RoIAlign → Shared2FC]
 
-    C --> C1[Lateral Convs: 256 from 2048/1024/512/256]
-    C --> C2[FPN Convs: 5 layers of Conv3x3 256]
-
-    D --> D1[RPN Conv: 256 to 256]
-    D --> D2[RPN Cls: 256 to 3 anchors]
-    D --> D3[RPN Reg: 256 to 12 coords (3x4)]
-
-    E --> E1[BBox RoI Extractor: RoIAlign 7x7 at 4 scales]
-    E --> E2[BBox Head: Shared2FC]
-    E2 --> E2a[FC1: 12544 to 1024]
-    E2 --> E2b[FC2: 1024 to 1024]
-    E2 --> E2c[FC Cls: 1024 to 2 classes]
-    E2 --> E2d[FC Reg: 1024 to 8 coords (2x4)]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#eef,stroke:#333
+    style C fill:#efe,stroke:#333
+    style D fill:#fee,stroke:#333
+    style E fill:#ffe,stroke:#333
 ```
+## Почему выбрана эта архитектура
+
+* Баланс точности и сложности
+
+* Faster R-CNN надёжно локализует объекты и хорошо работает с тонкими и сложными структурами (стены, перегородки), что критично для планов.
+
+**ResNet-50**
+
+-Достаточно глубокая сеть для сложных планов с множеством элементов.
+-FPN (Feature Pyramid Network)
+Поскольку стены и комнаты бывают разного масштаба. FPN:
+* объединяет признаки с разных уровней;
+* помогает корректно детектировать и мелкие, и крупные объекты.
+
+Для двух классов wall и room: 
+
+* можно восстановить топологию помещений;
+* поверх этого уже строить более богатую семантику (двери, окна, площади и т.п.).
+* Совместимость с MMDetection
+
+*Используется стандартный стек MMDetection 3.x + MMEngine + MMCV. Легко заменить бэкбон или детектор (на Cascade R-CNN, Swin, RetinaNet и др.).*
+
+## Слабые места
+
+1. Только два класса
+2. Двери, окна, мебель и прочие объекты не детектируются;
+3. Для этого нужно расширить датасет и увеличить количество классов.
+4. Для точной геометрии (маски стен/комнат) может потребоваться Mask R-CNN или отдельный сегментационный пайплайн.
+5. Нет обработки текста/размеров
+6. Числовые размеры и подписи на чертеже не обрабатываются; Для этого нужен отдельный OCR-пайплайн (см. раздел ниже).
+9. Чувствительность к стилю планов
+10. Толщина линий, стиль отрисовки, наличие текстур/заливок могут влиять на качество;
+11. Необходима адаптация/дообучение под конкретный домен.
+
+## OCR для размеров и текстов.
+
+**Рекомендуемый подход:**
+
+* Предобработка изображения
+* Повышение контраста, удаление цветных заливок, при необходимости бинаризация.
+* Нормализация разрешения (слишком мелкий текст плохо читается).
+* Поиск текстовых регионов
+
+
 
 
 
